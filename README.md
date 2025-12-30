@@ -55,3 +55,5 @@ sentinel://redis123@redis-sentinel.redis.svc.cluster.local:26379/mymaster
 # 直连 Master（不推荐，无法自动故障转移）
 redis://:redis123@redis-master.redis.svc.cluster.local:6379
 ```
+
+xxxxx

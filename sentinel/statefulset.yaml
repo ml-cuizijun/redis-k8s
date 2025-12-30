@@ -1,0 +1,79 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: redis-sentinel
+  namespace: redis
+spec:
+  serviceName: redis-sentinel
+  replicas: 3  # Sentinel 至少 3 个节点
+  selector:
+    matchLabels:
+      app: redis
+      role: sentinel
+  template:
+    metadata:
+      labels:
+        app: redis
+        role: sentinel
+    spec:
+      initContainers:
+        # 等待 Master 启动
+        - name: wait-for-master
+          image: redis:7.2-alpine
+          command:
+            - sh
+            - -c
+            - |
+              until redis-cli -h redis-master -a redis123 ping; do
+                echo "Waiting for master..."
+                sleep 2
+              done
+              echo "Master is ready!"
+      containers:
+        - name: sentinel
+          image: redis:7.2-alpine
+          command:
+            - redis-sentinel
+            - /etc/redis/sentinel.conf
+          ports:
+            - containerPort: 26379
+              name: sentinel
+          volumeMounts:
+            - name: sentinel-config
+              mountPath: /etc/redis
+            - name: sentinel-data
+              mountPath: /data
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              cpu: 200m
+              memory: 128Mi
+          livenessProbe:
+            exec:
+              command:
+                - redis-cli
+                - -p
+                - "26379"
+                - ping
+            initialDelaySeconds: 30
+            periodSeconds: 10
+          readinessProbe:
+            exec:
+              command:
+                - redis-cli
+                - -p
+                - "26379"
+                - ping
+            initialDelaySeconds: 5
+            periodSeconds: 5
+      volumes:
+        - name: sentinel-config
+          configMap:
+            name: redis-config
+            items:
+              - key: sentinel.conf
+                path: sentinel.conf
+        - name: sentinel-data
+          emptyDir: {}
